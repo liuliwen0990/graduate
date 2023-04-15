@@ -315,6 +315,7 @@ def threshold_desicion(train_pre_label,true_label):
 snr_val = ['-20','-15','-10','-5','0','5','10','15','20']
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device ="cpu"
+
 #train_num_val = ['20','40','60','100']
 #train_num_val = ['50','10','20','30']
 train_num_val = ['20']
