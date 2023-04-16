@@ -351,10 +351,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 for snr in train_snr_val:
     root1 = r"E:\liuliwen\graduatework\dataset\tfimage\image_train\images_snr_{}.txt".format(snr)
+
     if count == 0:
         my_train_datasets = Mydata_sets(root1, transform=transforms)
     else:
         my_train_datasets += Mydata_sets(root1, transform=transforms)
+    count += 1
 
 
 
