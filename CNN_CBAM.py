@@ -47,7 +47,8 @@ class Mydata_sets(Dataset):
     def __getitem__(self, index):
         fn, label = self.imgs[index]
         label = label.to(device)
-        img = Image.open(os.path.join(self.txt[:-4], fn))
+        # self.txt is the label txt path
+        img = Image.open(os.path.join(os.path.dirname(self.txt), fn))
         if self.transform is not None:
             img = self.transform(img)
             img = img.to(device)
