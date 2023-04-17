@@ -272,34 +272,34 @@ class MLCNN(nn.Module):
         # in_channels输入数据通道数
         # padding:第一个数是高度，第二个是宽度
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=(3, 3), stride=1, padding=(1, 1)),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-        )
-        self.attention1 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
-        # 64*128*128
-        self.pool1 = nn.MaxPool2d(2, stride=2)
-        #64*64*64
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=32, kernel_size=(3, 3), stride=1, padding=0),
+            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3, 3), stride=1, padding=(1, 1)),
             nn.BatchNorm2d(32),
             nn.ReLU(),
         )
-        self.attention2 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
-        # 32*62*62
+        self.attention1 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
+        # 32*128*128
+        self.pool1 = nn.MaxPool2d(2, stride=2)
+        #32*64*64
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=1, padding=0),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+        )
+        self.attention2 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
+        # 64*62*62
         self.pool2 = nn.MaxPool2d(2,stride=2)
-        #32*31*31
+        #64*31*31
         self.dropout1 = nn.Dropout(p=0.4)  # dropout训练
 
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(3, 3), stride=1, padding=(1,1)),
+            nn.Conv2d(in_channels=64, out_channels=32, kernel_size=(3, 3), stride=1, padding=(1,1)),
             nn.BatchNorm2d(16),
             nn.ReLU(),
         )
-        # 16*31*31
-        self.attention3 = CBAMBlock(channel=16,reduction=8,kernel_size=7)
+        # 32*31*31
+        self.attention3 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
         self.pool3 = nn.MaxPool2d(2, stride=2)
-        # 16*15*15
+        # 32*15*15
         self.conv4 = nn.Sequential(
             nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(3, 3), stride=1, padding=(1,1)),
             nn.BatchNorm2d(16),
@@ -311,11 +311,11 @@ class MLCNN(nn.Module):
         #self.dropout2 = nn.Dropout(p=0.25)
         # fully connected layer
         self.mlp1 = nn.Sequential(
-            nn.Linear(3600, 256),
+            nn.Linear(7200, 512),
             nn.ReLU(),
         )
         self.dropout3 = nn.Dropout(0.5)
-        self.mlp2 = nn.Linear(256, 5)
+        self.mlp2 = nn.Linear(512, 5)
         # self.mlp1 = nn.Linear(50 * 122, 256)
         # nn.ReLU()
         # self.mlp2 = nn.Linear(256, 5)
@@ -391,7 +391,7 @@ m = nn.Sigmoid()
 loss_func = nn.BCELoss()
 opt = torch.optim.Adam(model.parameters(), lr=1e-4)  # 论文就是0.01
 n_epoch = 100
-patience = 3  # 当验证集损失在连续15次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
+patience = 6  # 当验证集损失在连续15次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
 early_stopping = EarlyStopping(patience, verbose=True)  # 关于 EarlyStopping 的代码可先看博客后面的内容
 macro_auc_count = []
 hamming_loss_count = []
