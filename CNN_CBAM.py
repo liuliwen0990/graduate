@@ -293,7 +293,7 @@ class MLCNN(nn.Module):
 
         self.conv3 = nn.Sequential(
             nn.Conv2d(in_channels=64, out_channels=32, kernel_size=(3, 3), stride=1, padding=(1,1)),
-            nn.BatchNorm2d(16),
+            nn.BatchNorm2d(32),
             nn.ReLU(),
         )
         # 32*31*31
