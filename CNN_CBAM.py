@@ -272,32 +272,32 @@ class MLCNN(nn.Module):
         # in_channels输入数据通道数
         # padding:第一个数是高度，第二个是宽度
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3, 3), stride=1, padding=(1, 1)),
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=(3, 3), stride=1, padding=(1, 1)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+        )
+        self.attention1 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
+        # 64*128*128
+        self.pool1 = nn.MaxPool2d(2, stride=2)
+        #64*64*64
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=32, kernel_size=(3, 3), stride=1, padding=0),
             nn.BatchNorm2d(32),
             nn.ReLU(),
         )
-        self.attention1 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
-        # 32*128*128
-        self.pool1 = nn.MaxPool2d(2, stride=2)
-        #32*64*64
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(5, 5), stride=1, padding=0),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-        )
-        self.attention2 = CBAMBlock(channel=16,reduction=16,kernel_size=7)
-        # 32*60*60
+        self.attention2 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
+        # 32*62*62
         self.pool2 = nn.MaxPool2d(2,stride=2)
-        #32*30*30
+        #32*31*31
         self.dropout1 = nn.Dropout(p=0.4)  # dropout训练
 
         self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=16, out_channels=8, kernel_size=(3, 3), stride=1, padding=(1,1)),
-            nn.BatchNorm2d(8),
+            nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(3, 3), stride=1, padding=(1,1)),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
         )
-        # 8*30*30
-        self.attention3 = CBAMBlock(channel=8,reduction=8,kernel_size=7)
+        # 16*31*31
+        self.attention3 = CBAMBlock(channel=16,reduction=8,kernel_size=7)
         self.pool3 = nn.MaxPool2d(2, stride=2)
         # 16*15*15
         self.conv4 = nn.Sequential(
@@ -311,7 +311,7 @@ class MLCNN(nn.Module):
         #self.dropout2 = nn.Dropout(p=0.25)
         # fully connected layer
         self.mlp1 = nn.Sequential(
-            nn.Linear(7200, 256),
+            nn.Linear(3600, 256),
             nn.ReLU(),
         )
         self.dropout3 = nn.Dropout(0.5)
@@ -334,7 +334,7 @@ class MLCNN(nn.Module):
         x = self.dropout1(x)
         x = self.conv3(x)
         x = self.attention3(x)
-        #x = self.pool3(x)
+        x = self.pool3(x)
         #x = self.conv4(x)
         #x = self.attention4(x)
         #x = self.pool4(x)
@@ -353,8 +353,8 @@ test_snr_val = ['-20','-15','-10','-5','0','5','10','15','20']
 BATCH_SIZE = 8
 num_labels = 5
 count = 0
-#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = 'cpu'
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+#device = 'cpu'
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 for snr in train_snr_val:
     root1 = r"E:\liuliwen\graduatework\dataset\tfimage\image_train\images_snr_{}.txt".format(snr)
