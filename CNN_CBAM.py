@@ -362,6 +362,7 @@ for snr in train_snr_val:
         my_train_datasets = Mydata_sets(root1, transform=transforms)
     else:
         my_train_datasets += Mydata_sets(root1, transform=transforms)
+    count += 1
 
 
 
@@ -480,6 +481,7 @@ model.eval()
 with torch.no_grad():
     count_test_file = 0
     for test_snr in test_snr_val:
+        print("测试数据集SNR：",test_snr)
         falselabels = 0
         num_have_tested = 0
         root2 = r"E:\liuliwen\graduatework\dataset\tfimage\image_test\images_snr_{}.txt".format(test_snr)
