@@ -1,4 +1,4 @@
-import torch
+﻿import torch
 from torch.nn import init
 import torchvision.transforms as transforms
 import cv2
@@ -47,7 +47,6 @@ class Mydata_sets(Dataset):
     def __getitem__(self, index):
         fn, label = self.imgs[index]
         label = label.to(device)
-        # self.txt is the label txt path
         img = Image.open(os.path.join(os.path.dirname(self.txt), fn))
         if self.transform is not None:
             img = self.transform(img)
@@ -278,39 +277,45 @@ class MLCNN(nn.Module):
             nn.ReLU(),
         )
         self.attention1 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
-        # 32*2*128
+        # 32*128*128
+        self.pool1 = nn.MaxPool2d(2, stride=2)
+        #32*64*64
         self.conv2 = nn.Sequential(
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=(3, 3), stride=1, padding=0),
-            nn.BatchNorm2d(64),
+            nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(5, 5), stride=1, padding=0),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
         )
-        self.attention2 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
-        # 64*4*128
-        self.pool1 = nn.MaxPool2d(2,stride=2)
-        self.dropout1 = nn.Dropout(p=0.25)  # dropout训练
-        # 3*65
-        self.conv3 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=1, padding=(1,1)),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-        )
-        # 1*63
-        self.attention3 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=1, padding=0),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-        )
-        self.attention4 = CBAMBlock(channel=64, reduction=16, kernel_size=7)
+        self.attention2 = CBAMBlock(channel=16,reduction=16,kernel_size=7)
+        # 32*60*60
         self.pool2 = nn.MaxPool2d(2,stride=2)
-        self.dropout2 = nn.Dropout(p=0.25)
+        #32*30*30
+        self.dropout1 = nn.Dropout(p=0.4)  # dropout训练
+
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_channels=16, out_channels=8, kernel_size=(3, 3), stride=1, padding=(1,1)),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+        )
+        # 8*30*30
+        self.attention3 = CBAMBlock(channel=8,reduction=8,kernel_size=7)
+        self.pool3 = nn.MaxPool2d(2, stride=2)
+        # 16*15*15
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(in_channels=32, out_channels=16, kernel_size=(3, 3), stride=1, padding=(1,1)),
+            nn.BatchNorm2d(16),
+            nn.ReLU(),
+        )
+        #16*16*16
+        self.attention4 = CBAMBlock(channel=16, reduction=16, kernel_size=7)
+        #self.pool4 = nn.MaxPool2d(2,stride=2)
+        #self.dropout2 = nn.Dropout(p=0.25)
         # fully connected layer
         self.mlp1 = nn.Sequential(
-            nn.Linear(61504, 512),
+            nn.Linear(7200, 256),
             nn.ReLU(),
         )
         self.dropout3 = nn.Dropout(0.5)
-        self.mlp2 = nn.Linear(512, 5)
+        self.mlp2 = nn.Linear(256, 5)
         # self.mlp1 = nn.Linear(50 * 122, 256)
         # nn.ReLU()
         # self.mlp2 = nn.Linear(256, 5)
@@ -322,16 +327,18 @@ class MLCNN(nn.Module):
         """
         x = self.conv1(x)
         x = self.attention1(x)
+        x = self.pool1(x)
         x = self.conv2(x)
         x = self.attention2(x)
-        x = self.pool1(x)
+        x = self.pool2(x)
         x = self.dropout1(x)
         x = self.conv3(x)
         x = self.attention3(x)
+        #x = self.pool3(x)
         #x = self.conv4(x)
         #x = self.attention4(x)
-        x = self.pool2(x)
-        x = self.dropout2(x)
+        #x = self.pool4(x)
+        #x = self.dropout2(x)
         # view(x.size(0), -1): change tensor size from (N ,H , W) to (N, H*W)
         x = self.mlp1(x.view(x.size(0), -1))
         x = self.dropout3(x)
@@ -346,17 +353,15 @@ test_snr_val = ['-20','-15','-10','-5','0','5','10','15','20']
 BATCH_SIZE = 8
 num_labels = 5
 count = 0
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#device = 'cpu'
+#device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = 'cpu'
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 for snr in train_snr_val:
     root1 = r"E:\liuliwen\graduatework\dataset\tfimage\image_train\images_snr_{}.txt".format(snr)
-
     if count == 0:
         my_train_datasets = Mydata_sets(root1, transform=transforms)
     else:
         my_train_datasets += Mydata_sets(root1, transform=transforms)
-    count += 1
 
 
 
@@ -385,7 +390,7 @@ m = nn.Sigmoid()
 loss_func = nn.BCELoss()
 opt = torch.optim.Adam(model.parameters(), lr=1e-4)  # 论文就是0.01
 n_epoch = 100
-patience = 2  # 当验证集损失在连续15次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
+patience = 3  # 当验证集损失在连续15次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
 early_stopping = EarlyStopping(patience, verbose=True)  # 关于 EarlyStopping 的代码可先看博客后面的内容
 macro_auc_count = []
 hamming_loss_count = []
@@ -465,7 +470,7 @@ end = time.time()
 train_time = end - start
 print("训练结束\n epoch次数：%d" % (epoch))
 print("训练时间：%s Seconds" % (train_time))
-torch.save(model.state_dict(),"model/CNN_CBAM.pt")
+torch.save(model.state_dict(),"CNN_CBAM.pt")
 #thresholds = threshold_desicion(predict_prob_valid, label_true_valid)
 row0 = ['macro-acc','macro-f1','macro-AUC','one-error','ranking_loss','ave_precision','coverage','SNR','epoch','train_time']
 #row0 = ['accurancy','training time']
@@ -505,7 +510,7 @@ with torch.no_grad():
             # print (falselabels)
             label_true[a:num_have_tested, :] =y.cpu().numpy()
             pre_label[a:num_have_tested, :] = predict_label
-            predict_prob[a:num_have_tested, :] = out_probability.detach().numpy()
+            predict_prob[a:num_have_tested, :] = out_probability
 
         hamming_loss = falselabels / (num_test * 5)
         one_error = compute_one_error(predict_prob, label_true)
