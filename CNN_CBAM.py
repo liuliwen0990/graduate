@@ -395,12 +395,13 @@ patience = 3  # 当验证集损失在连续15次训练周期中都没有得到�
 early_stopping = EarlyStopping(patience, verbose=True)  # 关于 EarlyStopping 的代码可先看博客后面的内容
 macro_auc_count = []
 hamming_loss_count = []
-train_losses = []
+#train_losses = []
 valid_losses = []
 valid_hammingloss = []
-avg_train_losses = []
-avg_valid_losses = []
-
+#avg_train_losses = []
+#avg_valid_losses = []
+#train_losses = []
+valid_losses = []
 start = time.time()
 for epoch in range(1, n_epoch + 1):
 
@@ -422,7 +423,7 @@ for epoch in range(1, n_epoch + 1):
         opt.zero_grad()  # 清空上一步残余更新参数值
         loss.backward()  # 误差反向传播，计算参数更新值
         opt.step()  # 将参数更新值施加到net的parmeters上
-        train_losses.append(loss)
+        #train_losses.append(loss)
         # if i%5 == 0:
         # loss_count.append(loss)
         # print('{}:\t'.format(i), loss.item())
@@ -442,7 +443,8 @@ for epoch in range(1, n_epoch + 1):
         output = model(data)
         valid_probability = m(output)
         num_have_valided = f + len(target)
-        valid_loss = loss_func(valid_probability, target.float())
+        valid_loss_torch = loss_func(valid_probability, target.float())
+        valid_loss = valid_loss_torch.detach().cpu().numpy()
         valid_losses.append(valid_loss)
         # predict_label_valid = label_predict(valid_probability)
         # falselabels = falselabels + false_labels(target, predict_label_valid)
@@ -451,14 +453,15 @@ for epoch in range(1, n_epoch + 1):
         # pre_label_valid[f:num_have_valided, :] = predict_label_valid
         predict_prob_valid[f:num_have_valided, :] = valid_probability.detach().cpu().numpy()
     # print(type(train_losses))
-    train_loss = torch.mean(torch.stack(train_losses))
-    valid_loss = torch.mean(torch.stack(valid_losses))
+    #train_loss = torch.mean(torch.stack(train_losses))
+    #valid_loss = torch.mean(torch.stack(valid_losses))
+    valid_loss = np.mean(valid_losses)
     # hamming_loss_valid = falselabels / (valid_size * 5)
-    avg_train_losses.append(train_loss)
-    avg_valid_losses.append(valid_loss)
+    #avg_train_losses.append(train_loss)
+    #avg_valid_losses.append(valid_loss)
     # valid_hammingloss.append(hamming_loss_valid)
 
-    train_losses = []
+    #train_losses = []
     valid_losses = []
 
     early_stopping(valid_loss, model)
