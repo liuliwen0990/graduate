@@ -27,7 +27,7 @@ transforms = transforms.Compose(
      transforms.ToTensor(),
      transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))]
 )
-
+'''
 import random
 manualSeed = 1
 random.seed(manualSeed)
@@ -39,12 +39,12 @@ torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
 # 这么设置使用确定性算法，如果代码中有算法cuda没有确定性实现，则会报错，可以验证代码中有没有cuda没有确定性实现的代码
-# torch.use_deterministic_algorithms(True)
+#torch.use_deterministic_algorithms(True)
 # 这么设置使用确定性算法，如果代码中有算法cuda没有确定性实现，也不会报错
 torch.use_deterministic_algorithms(True, warn_only=True)
 
 os.environ['CUBLAS_WORKSPACE_CONFIG']=':4096:8'
-
+'''
 
 class Mydata_sets(Dataset):
     def __init__(self, txt, transform=None, target_transform=None):
@@ -205,6 +205,16 @@ def label_predict(output,threshold = 0.5):
             predict_label[i, index] = 1
 
     return predict_label
+'''
+def label_predict(output, threshold=0.5,num_labels = 1):
+    num_examples = len(output)
+    predict_label = np.zeros((num_examples, num_labels))
+    for i in range(0, num_examples):
+        if output[i] >= threshold:
+            predict_label[i,0] = 1
+
+    return predict_label
+'''
 def false_labels(true_label, predict_label):
     num_examples, num_labels = predict_label.shape
     false_label = 0
@@ -287,7 +297,8 @@ class CBAMBlock(nn.Module):
         residual = x
         out = x * self.ca(x)
         out = out * self.sa(out)
-        return out + residual
+        #return out + residual
+        return out
 
 
 class MLCNN(nn.Module):
@@ -302,7 +313,7 @@ class MLCNN(nn.Module):
             nn.BatchNorm2d(32),
             nn.ReLU(),
         )
-        self.attention1 = CBAMBlock(channel=32,reduction=16,kernel_size=7)
+        self.attention1 = CBAMBlock(channel=32,reduction=4,kernel_size=5)
 
         self.pool1 = nn.MaxPool2d(2, stride=2)
 
@@ -311,7 +322,7 @@ class MLCNN(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(),
         )
-        self.attention2 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
+        self.attention2 = CBAMBlock(channel=64,reduction=4,kernel_size=3)
 
         self.pool2 = nn.MaxPool2d(2,stride=2)
 
@@ -324,24 +335,23 @@ class MLCNN(nn.Module):
             nn.ReLU(),
         )
 
-        self.attention3 = CBAMBlock(channel=64,reduction=16,kernel_size=7)
+        self.attention3 = CBAMBlock(channel=64,reduction=4,kernel_size=3)
         self.pool3 = nn.MaxPool2d(2, stride=2)
-        self.pool4 = nn.MaxPool2d(2, stride=2)
-        # 32*15*15
-        self.conv4 = nn.Sequential(
-            nn.Conv2d(in_channels=64, out_channels=64, kernel_size=(3, 3), stride=1, padding=(0,0), bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-        )
-        #16*16*16
-        self.attention4 = CBAMBlock(channel=64, reduction=16, kernel_size=7)
+
+        #self.pool3 = nn.AdaptiveAvgPool2d(1)
+
+
         self.mlp1 = nn.Sequential(
-            nn.Linear(3136, 512),
+            nn.Linear(3136, 256),
             nn.ReLU(),
         )
         self.dropout3 = nn.Dropout(0.5)
+        self.mlp3 = nn.Sequential(
+            nn.Linear(256, 256),
+            nn.ReLU(),
+        )
         self.mlp2 = nn.Sequential(
-        nn.Linear(512, 5),
+            nn.Linear(256, 5),
         )
 
     def forward(self, x):
@@ -359,25 +369,75 @@ class MLCNN(nn.Module):
         x = self.conv3(x)
         x = self.attention3(x)
         x = self.pool3(x)
-        
+
         # x = self.conv4(x)
         # x = self.attention4(x)
         # x = self.pool4(x)
         x = self.dropout2(x)
-        
-        #print(x.shape)
+
+        # print(x.shape)
         # view(x.size(0), -1): change tensor size from (N ,H , W) to (N, H*W)
-        x = self.mlp1(x.view(x.size(0), -1))
+        x = x.view(x.size(0), -1)
+        x = self.mlp1(x)
         x = self.dropout3(x)
+        x = self.mlp3(x)
         x = self.mlp2(x)
 
         return x
 
 
-#train_snr_val = ['-20','-15','-10','-5','0','5','10','15','20']
+
+def threshold_desicion(y_prob, y_label):
+    thresholds = []
+    num_samples,num_label = y_label.shape
+
+    threshold = [0]*num_label
+    eplison = np.arange(0, 1, 0.05)
+
+    for i in range(num_label):
+        F = np.zeros((1,len(eplison)))
+
+        y_label_list = list(y_label[:,i])
+        true_1_sum = sum(y_label_list)
+        #print(true_1_sum)
+        #print(y_prob[:, i])
+        for j in range(len(eplison)):
+            predict_label = label_predict(y_prob[:,i],eplison[j],1)
+            predict_1_sum = sum(predict_label)
+            #print("predict_1_sum=", predict_1_sum)
+            count = 0
+            for k in range(num_samples):
+                count += predict_label[k,0] * y_label[k,i]
+
+            #print("count=",count)
+            F[0,j] = 2* count/(predict_1_sum+true_1_sum)
+
+        max_index = np.where(F == np.max(F))
+        index = max(max_index[1])
+        #print(max_index[1])
+        #print(index)
+        threshold[i] = eplison[index]
+    print(threshold)
+    return threshold
+
+def label_predict_new(output, thresholds):
+    num_examples, num_labels = output.shape
+    predict_label = np.zeros((num_examples, num_labels))
+    for i in range(0, num_examples):
+        for j in range(0, num_labels):
+            if output[i, j] >= thresholds[j]:
+                predict_label[i, j] = 1
+        if not 1 in predict_label[i,:]:
+            index = np.where(output[i,:]==max(output[i,:]))
+            predict_label[i,index]=1
+
+    return predict_label
+
 train_snr_val = ['-20','-15','-10','-5','0','5','10','15','20']
+#train_snr_val = ['20']
 test_snr_val = ['-20','-15','-10','-5','0','5','10','15','20']
-BATCH_SIZE = 8
+
+BATCH_SIZE = 16
 num_labels = 5
 count = 0
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -408,10 +468,12 @@ valid_size = len(my_train_datasets)-train_size
 
 
 train_dataset, valid_dataset = torch.utils.data.random_split(my_train_datasets, [train_size, valid_size])
-
-# 我这里面作弊了
-#train_dataset += my_test_datasets
-
+'''
+train_test_size = int(0.4*len(my_test_datasets))
+test_size = len(my_test_datasets)-train_test_size
+train_test_dataset, _ = torch.utils.data.random_split(my_test_datasets, [train_test_size, test_size])
+train_dataset += train_test_dataset
+'''
 train_loader = Data.DataLoader(
             dataset=train_dataset,
             batch_size=BATCH_SIZE,
@@ -428,8 +490,8 @@ model.apply(weight_init)
 model = model.to(device)
 m = nn.Sigmoid()
 loss_func = nn.BCELoss()
-opt = torch.optim.Adam(model.parameters(), lr=1e-4)  # 论文就是0.01,weight_decay=0.01
-n_epoch = 30
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)  # 论文就是0.01,weight_decay=0.01
+n_epoch = 100
 patience = 10  # 当验证集损失在连续15次训练周期中都没有得到降低时，停止模型训练，以防止模型过拟合
 early_stopping = EarlyStopping(patience, verbose=True)  # 关于 EarlyStopping 的代码可先看博客后面的内容
 macro_auc_count = []
@@ -514,6 +576,7 @@ end = time.time()
 train_time = end - start
 print("训练结束\n epoch次数：%d" % (epoch))
 print("训练时间：%s Seconds" % (train_time))
+#thresholds = threshold_desicion(predict_prob_valid, label_true_valid)
 torch.save(model.state_dict(),"CNN_CBAM.pt")
 #thresholds = threshold_desicion(predict_prob_valid, label_true_valid)
 row0 = ['macro-acc','macro-f1','macro-AUC','one-error','ranking_loss','ave_precision','coverage','SNR','epoch','train_time']
@@ -550,7 +613,7 @@ with torch.no_grad():
             out_probability = m(out)
             out_probability = out_probability.detach().cpu().numpy()
             # 得到预测标签
-            predict_label = label_predict(out_probability, 0.5)
+            predict_label = label_predict(out_probability)
             falselabels = falselabels + false_labels(test_y, predict_label)
             # print (falselabels)
             label_true[a:num_have_tested, :] =y.cpu().numpy()
@@ -584,7 +647,7 @@ with torch.no_grad():
         performance_sheet.write(count_test_file, 8, epoch)
         performance_sheet.write(count_test_file, 9, train_time)
     import sys
-    filename = sys.argv[0] + ".xls"
+    filename = sys.argv[0] + "with_attention.xls"
     workbook.save(filename)
 
 '''
